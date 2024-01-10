@@ -1,0 +1,78 @@
+public static class ObjectPropertyWriter
+{
+    public static string WriteProperties(object obj)
+    {
+        var sb = new StringBuilder();
+        WritePropertiesRecursive(obj, sb);
+        return sb.ToString();
+    }
+
+    private static void WritePropertiesRecursive(object obj, StringBuilder sb, string indent = "")
+    {
+        if (obj == null)
+        {
+            sb.AppendLine($"{indent}null");
+            return;
+        }
+
+        var type = obj.GetType();
+
+        // Handle IEnumerable separately to iterate over elements
+        if (typeof(IEnumerable).IsAssignableFrom(type) && type != typeof(string))
+        {
+            var enumerable = (IEnumerable)obj;
+            foreach (var item in enumerable) WritePropertiesRecursive(item, sb, indent + "\t");
+            return;
+        }
+
+        // If it's not an IEnumerable or it's a string write the object directly.
+        if (type != typeof(string) && !type.IsPrimitive && !type.IsEnum)
+        {
+            foreach (var property in type.GetProperties())
+            {
+                var value = property.GetValue(obj);
+                var propertyName = $"{indent}{property.Name}";
+
+                // Check if the value is a complex type.
+                if (value != null && ShouldRecurseIntoType(value.GetType()))
+                {
+                    sb.AppendLine($"{propertyName}=");
+                    WritePropertiesRecursive(value, sb, $"{indent}\t"); // Recurse into complex types.
+                }
+                else
+                {
+                    var formattedValue = FormatValue(value);
+                    sb.AppendLine($"{propertyName}={formattedValue}");
+                }
+            }
+        }
+        else
+        {
+            var formattedValue = FormatValue(obj);
+            sb.Append(formattedValue); // Append primitive types directly.
+        }
+    }
+
+    private static bool ShouldRecurseIntoType(Type type)
+    {
+        return !type.IsPrimitive &&
+               !(type == typeof(string)) &&
+               !(type == typeof(DateTime)) &&
+               !(type == typeof(decimal));
+    }
+
+    private static string FormatValue(object value)
+    {
+        switch (value)
+        {
+            case DateTime dateTime:
+                return dateTime.ToString("o"); // ISO 8601 format
+
+            case null:
+                return "null";
+
+            default:
+                return value.ToString().Replace(Environment.NewLine, " "); // Replace newlines for readability.
+        }
+    }
+}
